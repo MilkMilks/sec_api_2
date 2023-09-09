@@ -1,130 +1,146 @@
 const axios = require("axios");
 const fs = require("fs");
-const cheerio = require("cheerio"); // for parsing HTML
+const cheerio = require("cheerio");
+const logger = require("winston");
+const commander = require("commander");
 
-// Read nasdaq firms file
+// Read firms file
 const firms = [];
 
-function readFirms() {
+async function readFirms() {
   const data = fs.readFileSync("./nasdaq_firms.tsv", "utf8");
 
   data.split("\n").forEach((line) => {
-    const [cik, ticker] = line.trim().split("\t");
-    firms.push({ cik, ticker });
+    let [cik, ticker] = line.trim().split("\t");
+    ticker = ticker.toLowerCase();
+    firms.push({
+      cik,
+      ticker,
+    });
   });
 }
-readFirms();
 
-// Get all filings for a CIK
-const getAllFilings = async (cik, requested_forms, start_date, end_date) => {
-  // Convert cik to string
+// Get filings metadata
 
-  let cikStr = cik;
-
-  // Prepend zeros until length is 10
-  while (cikStr.length != 10) {
-    cikStr = "0" + cikStr;
-  }
-
-  const url = `https://data.sec.gov/submissions/CIK${cikStr}.json`;
-  console.log(url);
+// Get filings metadata
+async function getAllFilings(cik_or_ticker, searchForm, startDate, endDate) {
   try {
-    const headers = {
-      "User-Agent": "Personal evan@kasukedo.com",
-      "Accept-Encoding": "gzip, deflate",
-    };
+    cik_or_ticker = cik_or_ticker[0];
+    console.log("cik_or_ticker", cik_or_ticker);
+    const cik = cik_or_ticker.cik;
+    const ticker = cik_or_ticker.ticker;
+    const cikPadded = cik.padStart(10, "0");
+    const url = `https://data.sec.gov/submissions/CIK${cikPadded}.json`;
 
-    const response = await axios.get(url, { headers });
+    const response = await axios.get(url);
+    // make API request
     const submissions = response.data;
-    // console.log("submissions", submissions);
-    // Extract filing URLs from response
-    // const filingUrls = response.data.filings.file.map((f) => f.url);
-    // console.log("filingUrls", filingUrls);
     const filingUrls = submissions.filings.recent;
-    console.log(Object.keys(filingUrls));
-    // [
-    //   'accessionNumber',
-    //   'filingDate',
-    //   'reportDate',
-    //   'acceptanceDateTime',
-    //   'act',
-    //   'form',
-    //   'fileNumber',
-    //   'filmNumber',
-    //   'items',
-    //   'size',
-    //   'isXBRL',
-    //   'isInlineXBRL',
-    //   'primaryDocument',
-    //   'primaryDocDescription'
-    // ]
-    let filingsMetadata = [];
-
-    Object.keys(submissions).forEach((key) => {
-      if (key !== "filings") {
-        filingsMetadata.push(submissions[key]);
-      }
-    });
-
-    // console.log(filingsMetadata);
+    // console.log("filingUrls", filingUrls);
     const {
       accessionNumber: accessionNumbers,
       filingDate: filingDates,
-      reportDate: reportDates,
-      form: forms,
       primaryDocument: primaryDocuments,
+      form: filingForms,
     } = filingUrls;
 
-    const urls = accessionNumbers.map((_, i) => {
-      let accessionNumber = accessionNumbers[i].replace(/-/g, "");
-      let filingDate = filingDates[i];
-      let reportDate = reportDates[i];
-      let form = forms[i];
-      let primaryDocument = primaryDocuments[i];
-      console.log(
-        `https://www.sec.gov/Archives/edgar/data/${cik}/${accessionNumber}/${primaryDocument}`
-      );
-      return `https://www.sec.gov/Archives/edgar/data/${cik}/${accessionNumber}/${primaryDocument}`;
-    });
+    const urls = [];
 
-    // console.log("adsh ", accessionNumbers);
-    return filingUrls;
-  } catch (err) {
-    console.error(`Error fetching filings: ${err}`);
-  }
-};
+    for (let i = 0; i < accessionNumbers.length; i++) {
+      const filingDate = new Date(filingDates[i]); // convert to Date object
+      if (filingDate >= startDate && filingDate <= endDate) {
+        // Filing is within date range
 
-// Get HTML content from a filing URL
-const getHTMLfromFiling = async (url) => {
-  try {
-    // const response = await axios.get(url);
-    return response.data;
-  } catch (err) {
-    console.error(`Error fetching HTML: ${err}`);
-  }
-};
+        const accessionNumber = accessionNumbers[i].replace(/-/g, "");
+        const primaryDocument = primaryDocuments[i];
 
-// Loop through firms and get filings
-let x = 0;
-const go = async (options) => {
-  // console.log(firms);
-  for (let i = 1; i < firms.length; i++) {
-    const firm = firms[i];
-    x++;
-    if (x > 2) {
-      break;
+        const url_ = `https://www.sec.gov/Archives/edgar/data/${cik}/${accessionNumber}/${primaryDocument}`;
+
+        if (filingForms[i] == searchForm) {
+          urls.push(url_);
+        }
+      }
     }
-    // console.log(`Getting filings for ${firm.cik}...`);
-    const filingUrls = await getAllFilings(firm.cik);
-    // console.log(`filingUrls: ${i}`, filingUrls);
-    // for (let url of filingUrls) {
-    //   const html = await getHTMLfromFiling(url);
-
-    //   // Parse HTML with cheerio here
-    //   const $ = cheerio.load(html);
-    // ... extract data
-    // }
+    return urls;
+  } catch (error) {
+    logger.error(`Error fetching filings: ${error}`);
   }
-};
-const options = {};
-go();
+}
+
+// Get HTML for filing
+
+async function getHTMLFromFiling(url) {
+  try {
+    const response = await axios.get(url);
+
+    return response.data;
+  } catch (error) {
+    logger.error(`Error fetching HTML: ${error}`);
+  }
+}
+
+// Throttle requests
+
+async function throttle() {
+  await new Promise((resolve) => setTimeout(resolve, 110));
+}
+
+// Parse HTML
+
+function parseHTML(html) {
+  const $ = cheerio.load(html);
+
+  // Parse HTML here
+
+  return parsedData;
+}
+
+// Save parsed data
+
+function saveData(data) {
+  fs.writeFileSync("parsed.json", JSON.stringify(data));
+}
+
+async function main() {
+  await readFirms();
+
+  commander
+
+    .option("-f, --search_form <search_form>", "filing forms to search")
+
+    .option("-s, --start <start>", "start date")
+
+    .option("-e, --end <end>", "end date")
+
+    .option("-t, --ticker <ticker>", "company ticker symbol")
+
+    .parse(process.argv);
+
+  const options = commander.opts();
+  console.log("options", options);
+
+  const firm = firms.filter((f) => f.ticker == options.ticker);
+
+  if (!firm) {
+    console.error("Ticker not found");
+
+    return;
+  }
+
+  const filings = await getAllFilings(
+    firm,
+    options.search_form,
+    new Date(options.start),
+    new Date(options.end)
+  );
+  console.log(filings);
+  for (let filing of filings) {
+    console.log(filing);
+    const html = await getHTMLFromFiling(filing);
+    await throttle(); // Add delay between requests
+    const parsed = parseHTML(html);
+    saveData(parsed);
+  }
+}
+
+main();
