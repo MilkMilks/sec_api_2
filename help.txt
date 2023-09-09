@@ -1,0 +1,1 @@
+I need a basic structure for api calls to a remote server in node.js, what would you recommend for the file/folder structure?
