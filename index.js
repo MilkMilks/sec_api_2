@@ -3,6 +3,21 @@ const fs = require("fs");
 const cheerio = require("cheerio");
 const logger = require("winston");
 const commander = require("commander");
+const diversityKeywords = [
+  "black",
+  "transgender",
+  "african american",
+  "asian",
+  "latinx",
+  "hispanic",
+  "gender",
+  "race",
+  "ethnicity",
+  "LGBTQ",
+  "disability",
+  "veteran status",
+];
+const genderExpressionRegex = /gender\s*expression/i;
 
 // Read firms file
 const firms = [];
@@ -43,7 +58,6 @@ async function getAllFilings(cik_or_ticker, searchForm, startDate, endDate) {
       primaryDocument: primaryDocuments,
       form: filingForms,
     } = filingUrls;
-
     const urls = [];
 
     for (let i = 0; i < accessionNumbers.length; i++) {
@@ -57,7 +71,7 @@ async function getAllFilings(cik_or_ticker, searchForm, startDate, endDate) {
         const url_ = `https://www.sec.gov/Archives/edgar/data/${cik}/${accessionNumber}/${primaryDocument}`;
 
         if (filingForms[i] == searchForm) {
-          urls.push(url_);
+          urls.push({ url_, filingDate, accessionNumber, ticker });
         }
       }
     }
@@ -72,7 +86,6 @@ async function getAllFilings(cik_or_ticker, searchForm, startDate, endDate) {
 async function getHTMLFromFiling(url) {
   try {
     const response = await axios.get(url);
-
     return response.data;
   } catch (error) {
     logger.error(`Error fetching HTML: ${error}`);
@@ -86,19 +99,67 @@ async function throttle() {
 }
 
 // Parse HTML
-
 function parseHTML(html) {
   const $ = cheerio.load(html);
 
-  // Parse HTML here
+  const filteredTables = [];
 
-  return parsedData;
+  $("table").each((i, table) => {
+    // Filter table logic
+    const text = $(table).text().toLowerCase();
+    // console.log(text);
+    let keywordCount = 0;
+
+    diversityKeywords.forEach((keyword) => {
+      // keyword checks
+      if (text.includes(keyword)) {
+        keywordCount++;
+      }
+    });
+
+    if (text.includes("black/african american")) {
+      keywordCount++;
+    }
+
+    if (genderExpressionRegex.test(text)) {
+      keywordCount++;
+    }
+
+    if (keywordCount >= 2) {
+      filteredTables.push($.html(table));
+    }
+  });
+  // console.log(filteredTables);
+
+  return filteredTables;
 }
 
 // Save parsed data
+function saveData(tables, ticker, filingDate, accessionNumber) {
+  let htmlStrings = [];
 
-function saveData(data) {
-  fs.writeFileSync("parsed.json", JSON.stringify(data));
+  for (let table of tables) {
+    htmlStrings.push(table);
+  }
+  try {
+    console.log("check 1");
+    const html = htmlStrings.join("\n");
+    let dir = `./filings`;
+    if (!fs.existsSync(dir)) {
+      console.log(123);
+      fs.mkdirSync(dir);
+    }
+    dir = dir + `/${ticker}`;
+    if (!fs.existsSync(dir)) {
+      fs.mkdirSync(dir);
+      console.log(456);
+    }
+
+    const filePath = `${dir}/${filingDate}__${accessionNumber}.html`;
+    if (html.length > 0) fs.writeFileSync(filePath, html);
+  } catch (e) {
+    console.log(e);
+  }
 }
 
 async function main() {
@@ -133,13 +194,15 @@ async function main() {
     new Date(options.start),
     new Date(options.end)
   );
-  console.log(filings);
+  // console.log(filings);
   for (let filing of filings) {
     console.log(filing);
-    const html = await getHTMLFromFiling(filing);
+    const html = await getHTMLFromFiling(filing.url_);
     await throttle(); // Add delay between requests
-    const parsed = parseHTML(html);
-    saveData(parsed);
+    const parsedTables = parseHTML(html);
+    filingDate = new Date(filing.filingDate).toISOString().split("T")[0];
+
+    saveData(parsedTables, filing.ticker, filingDate, filing.accessionNumber);
   }
 }
 
