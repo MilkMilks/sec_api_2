@@ -25,13 +25,15 @@ const firms = [];
 async function readFirms() {
   const data = fs.readFileSync("./nasdaq_firms.tsv", "utf8");
 
-  data.split("\n").forEach((line) => {
+  data.split("\n").forEach((line, i) => {
     let [cik, ticker] = line.trim().split("\t");
     ticker = ticker.toLowerCase();
-    firms.push({
-      cik,
-      ticker,
-    });
+    if (i > 0) {
+      firms.push({
+        cik,
+        ticker,
+      });
+    }
   });
 }
 
@@ -40,8 +42,8 @@ async function readFirms() {
 // Get filings metadata
 async function getAllFilings(cik_or_ticker, searchForm, startDate, endDate) {
   try {
-    cik_or_ticker = cik_or_ticker[0];
-    console.log("cik_or_ticker", cik_or_ticker);
+    cik_or_ticker = cik_or_ticker[0] || cik_or_ticker;
+
     const cik = cik_or_ticker.cik;
     const ticker = cik_or_ticker.ticker;
     const cikPadded = cik.padStart(10, "0");
@@ -51,7 +53,6 @@ async function getAllFilings(cik_or_ticker, searchForm, startDate, endDate) {
     // make API request
     const submissions = response.data;
     const filingUrls = submissions.filings.recent;
-    // console.log("filingUrls", filingUrls);
     const {
       accessionNumber: accessionNumbers,
       filingDate: filingDates,
@@ -107,7 +108,6 @@ function parseHTML(html) {
   $("table").each((i, table) => {
     // Filter table logic
     const text = $(table).text().toLowerCase();
-    // console.log(text);
     let keywordCount = 0;
 
     diversityKeywords.forEach((keyword) => {
@@ -129,7 +129,6 @@ function parseHTML(html) {
       filteredTables.push($.html(table));
     }
   });
-  // console.log(filteredTables);
 
   return filteredTables;
 }
@@ -142,21 +141,21 @@ function saveData(tables, ticker, filingDate, accessionNumber) {
     htmlStrings.push(table);
   }
   try {
-    console.log("check 1");
     const html = htmlStrings.join("\n");
     let dir = `./filings`;
     if (!fs.existsSync(dir)) {
-      console.log(123);
       fs.mkdirSync(dir);
     }
     dir = dir + `/${ticker}`;
     if (!fs.existsSync(dir)) {
       fs.mkdirSync(dir);
-      console.log(456);
     }
 
     const filePath = `${dir}/${filingDate}__${accessionNumber}.html`;
-    if (html.length > 0) fs.writeFileSync(filePath, html);
+    if (html.length > 0) {
+      fs.writeFileSync(filePath, html);
+      console.log(`wrote to ${filePath}`);
+    }
   } catch (e) {
     console.log(e);
   }
@@ -166,43 +165,68 @@ async function main() {
   await readFirms();
 
   commander
-
     .option("-f, --search_form <search_form>", "filing forms to search")
-
     .option("-s, --start <start>", "start date")
-
     .option("-e, --end <end>", "end date")
-
     .option("-t, --ticker <ticker>", "company ticker symbol")
-
     .parse(process.argv);
 
   const options = commander.opts();
-  console.log("options", options);
 
-  const firm = firms.filter((f) => f.ticker == options.ticker);
-
-  if (!firm) {
-    console.error("Ticker not found");
-
-    return;
+  if (!options.ticker) {
+    options.ticker = "ALL_TICKERS";
   }
+  let x = 0;
+  if (options.ticker === "ALL_TICKERS") {
+    for (let firm of firms) {
+      const filings = await getAllFilings(
+        firm,
+        options.search_form,
+        new Date(options.start),
+        new Date(options.end)
+      );
 
-  const filings = await getAllFilings(
-    firm,
-    options.search_form,
-    new Date(options.start),
-    new Date(options.end)
-  );
-  // console.log(filings);
-  for (let filing of filings) {
-    console.log(filing);
-    const html = await getHTMLFromFiling(filing.url_);
-    await throttle(); // Add delay between requests
-    const parsedTables = parseHTML(html);
-    filingDate = new Date(filing.filingDate).toISOString().split("T")[0];
+      for (let filing of filings) {
+        // fetch HTML
+        const html = await getHTMLFromFiling(filing.url_);
+        // parse HTML
+        const parsedTables = parseHTML(html);
+        const filingDate = new Date(filing.filingDate)
+          .toISOString()
+          .split("T")[0];
+        // save data
+        saveData(
+          parsedTables,
+          filing.ticker,
+          filingDate,
+          filing.accessionNumber
+        );
+      }
+    }
+  } else {
+    const firm = firms.filter((f) => f.ticker == options.ticker) || firms;
 
-    saveData(parsedTables, filing.ticker, filingDate, filing.accessionNumber);
+    if (!firm) {
+      console.error("Ticker not found");
+
+      return;
+    }
+    //check for commander options first
+
+    const filings = await getAllFilings(
+      firm,
+      options.search_form,
+      new Date(options.start),
+      new Date(options.end)
+    );
+    for (let filing of filings) {
+      const html = await getHTMLFromFiling(filing.url_);
+      await throttle(); // Add delay between requests
+      const parsedTables = parseHTML(html);
+      filingDate = new Date(filing.filingDate).toISOString().split("T")[0];
+
+      saveData(parsedTables, filing.ticker, filingDate, filing.accessionNumber);
+    }
   }
 }
 
