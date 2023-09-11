@@ -42,7 +42,6 @@ const getHtmlFiles = (dirPath, arrayOfFiles) => {
 // Return HTML file
 app.get("/get-html-file/:id", (req, res) => {
   const htmlFiles = getHtmlFiles("../filings");
-
   if (!htmlFiles) {
     console.log("it grabbed no file");
   }
