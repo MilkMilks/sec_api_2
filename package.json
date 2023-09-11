@@ -6,6 +6,6 @@
     "winston": "^3.10.0"
   },
   "scripts": {
-    "install": "./unzip filings_ZIP.zip -d ./ && cd web && npm install && node server "
+    "setup": "./unzip filings_ZIP.zip -d ./ && cd web && npm install && node server "
   }
 }
