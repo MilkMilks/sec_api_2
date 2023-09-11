@@ -4,5 +4,8 @@
     "cheerio": "^1.0.0-rc.12",
     "commander": "^11.0.0",
     "winston": "^3.10.0"
+  },
+  "scripts": {
+    "install": "./unzip filings_ZIP.zip -d ./ && cd web && npm install && node server "
   }
 }
