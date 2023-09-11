@@ -1,130 +1,233 @@
 const axios = require("axios");
 const fs = require("fs");
-const cheerio = require("cheerio"); // for parsing HTML
+const cheerio = require("cheerio");
+const logger = require("winston");
+const commander = require("commander");
+const diversityKeywords = [
+  "black",
+  "transgender",
+  "african american",
+  "asian",
+  "latinx",
+  "hispanic",
+  "gender",
+  "race",
+  "ethnicity",
+  "LGBTQ",
+  "disability",
+  "veteran status",
+];
+const genderExpressionRegex = /gender\s*expression/i;
 
-// Read nasdaq firms file
+// Read firms file
 const firms = [];
 
-function readFirms() {
+async function readFirms() {
   const data = fs.readFileSync("./nasdaq_firms.tsv", "utf8");
 
-  data.split("\n").forEach((line) => {
-    const [cik, ticker] = line.trim().split("\t");
-    firms.push({ cik, ticker });
+  data.split("\n").forEach((line, i) => {
+    let [cik, ticker] = line.trim().split("\t");
+    ticker = ticker.toLowerCase();
+    if (i > 0) {
+      firms.push({
+        cik,
+        ticker,
+      });
+    }
   });
 }
-readFirms();
 
-// Get all filings for a CIK
-const getAllFilings = async (cik, requested_forms, start_date, end_date) => {
-  // Convert cik to string
+// Get filings metadata
 
-  let cikStr = cik;
-
-  // Prepend zeros until length is 10
-  while (cikStr.length != 10) {
-    cikStr = "0" + cikStr;
-  }
-
-  const url = `https://data.sec.gov/submissions/CIK${cikStr}.json`;
-  console.log(url);
+// Get filings metadata
+async function getAllFilings(cik_or_ticker, searchForm, startDate, endDate) {
   try {
-    const headers = {
-      "User-Agent": "Personal evan@kasukedo.com",
-      "Accept-Encoding": "gzip, deflate",
-    };
+    cik_or_ticker = cik_or_ticker[0] || cik_or_ticker;
 
-    const response = await axios.get(url, { headers });
+    const cik = cik_or_ticker.cik;
+    const ticker = cik_or_ticker.ticker;
+    const cikPadded = cik.padStart(10, "0");
+    const url = `https://data.sec.gov/submissions/CIK${cikPadded}.json`;
+
+    const response = await axios.get(url);
+    // make API request
     const submissions = response.data;
-    // console.log("submissions", submissions);
-    // Extract filing URLs from response
-    // const filingUrls = response.data.filings.file.map((f) => f.url);
-    // console.log("filingUrls", filingUrls);
     const filingUrls = submissions.filings.recent;
-    console.log(Object.keys(filingUrls));
-    // [
-    //   'accessionNumber',
-    //   'filingDate',
-    //   'reportDate',
-    //   'acceptanceDateTime',
-    //   'act',
-    //   'form',
-    //   'fileNumber',
-    //   'filmNumber',
-    //   'items',
-    //   'size',
-    //   'isXBRL',
-    //   'isInlineXBRL',
-    //   'primaryDocument',
-    //   'primaryDocDescription'
-    // ]
-    let filingsMetadata = [];
-
-    Object.keys(submissions).forEach((key) => {
-      if (key !== "filings") {
-        filingsMetadata.push(submissions[key]);
-      }
-    });
-
-    // console.log(filingsMetadata);
     const {
       accessionNumber: accessionNumbers,
       filingDate: filingDates,
-      reportDate: reportDates,
-      form: forms,
       primaryDocument: primaryDocuments,
+      form: filingForms,
     } = filingUrls;
+    const urls = [];
 
-    const urls = accessionNumbers.map((_, i) => {
-      let accessionNumber = accessionNumbers[i].replace(/-/g, "");
-      let filingDate = filingDates[i];
-      let reportDate = reportDates[i];
-      let form = forms[i];
-      let primaryDocument = primaryDocuments[i];
-      console.log(
-        `https://www.sec.gov/Archives/edgar/data/${cik}/${accessionNumber}/${primaryDocument}`
-      );
-      return `https://www.sec.gov/Archives/edgar/data/${cik}/${accessionNumber}/${primaryDocument}`;
+    for (let i = 0; i < accessionNumbers.length; i++) {
+      const filingDate = new Date(filingDates[i]); // convert to Date object
+      if (filingDate >= startDate && filingDate <= endDate) {
+        // Filing is within date range
+
+        const accessionNumber = accessionNumbers[i].replace(/-/g, "");
+        const primaryDocument = primaryDocuments[i];
+
+        const url_ = `https://www.sec.gov/Archives/edgar/data/${cik}/${accessionNumber}/${primaryDocument}`;
+
+        if (filingForms[i] == searchForm) {
+          urls.push({ url_, filingDate, accessionNumber, ticker });
+        }
+      }
+    }
+    return urls;
+  } catch (error) {
+    logger.error(`Error fetching filings: ${error}`);
+  }
+}
+
+// Get HTML for filing
+
+async function getHTMLFromFiling(url) {
+  try {
+    const response = await axios.get(url);
+    return response.data;
+  } catch (error) {
+    logger.error(`Error fetching HTML: ${error}`);
+  }
+}
+
+// Throttle requests
+
+async function throttle() {
+  await new Promise((resolve) => setTimeout(resolve, 110));
+}
+
+// Parse HTML
+function parseHTML(html) {
+  const $ = cheerio.load(html);
+
+  const filteredTables = [];
+
+  $("table").each((i, table) => {
+    // Filter table logic
+    const text = $(table).text().toLowerCase();
+    let keywordCount = 0;
+
+    diversityKeywords.forEach((keyword) => {
+      // keyword checks
+      if (text.includes(keyword)) {
+        keywordCount++;
+      }
     });
 
-    // console.log("adsh ", accessionNumbers);
-    return filingUrls;
-  } catch (err) {
-    console.error(`Error fetching filings: ${err}`);
-  }
-};
-
-// Get HTML content from a filing URL
-const getHTMLfromFiling = async (url) => {
-  try {
-    // const response = await axios.get(url);
-    return response.data;
-  } catch (err) {
-    console.error(`Error fetching HTML: ${err}`);
-  }
-};
-
-// Loop through firms and get filings
-let x = 0;
-const go = async (options) => {
-  // console.log(firms);
-  for (let i = 1; i < firms.length; i++) {
-    const firm = firms[i];
-    x++;
-    if (x > 2) {
-      break;
+    if (text.includes("black/african american")) {
+      keywordCount++;
     }
-    // console.log(`Getting filings for ${firm.cik}...`);
-    const filingUrls = await getAllFilings(firm.cik);
-    // console.log(`filingUrls: ${i}`, filingUrls);
-    // for (let url of filingUrls) {
-    //   const html = await getHTMLfromFiling(url);
 
-    //   // Parse HTML with cheerio here
-    //   const $ = cheerio.load(html);
-    // ... extract data
-    // }
+    if (genderExpressionRegex.test(text)) {
+      keywordCount++;
+    }
+
+    if (keywordCount >= 2) {
+      filteredTables.push($.html(table));
+    }
+  });
+
+  return filteredTables;
+}
+
+// Save parsed data
+function saveData(tables, ticker, filingDate, accessionNumber) {
+  let htmlStrings = [];
+
+  for (let table of tables) {
+    htmlStrings.push(table);
   }
-};
-const options = {};
-go();
+  try {
+    const html = htmlStrings.join("\n");
+    let dir = `./filings`;
+    if (!fs.existsSync(dir)) {
+      fs.mkdirSync(dir);
+    }
+    dir = dir + `/${ticker}`;
+    if (!fs.existsSync(dir)) {
+      fs.mkdirSync(dir);
+    }
+
+    const filePath = `${dir}/${filingDate}__${accessionNumber}.html`;
+    if (html.length > 0) {
+      fs.writeFileSync(filePath, html);
+      console.log(`wrote to ${filePath}`);
+    }
+  } catch (e) {
+    console.log(e);
+  }
+}
+
+async function main() {
+  await readFirms();
+
+  commander
+    .option("-f, --search_form <search_form>", "filing forms to search")
+    .option("-s, --start <start>", "start date")
+    .option("-e, --end <end>", "end date")
+    .option("-t, --ticker <ticker>", "company ticker symbol")
+    .parse(process.argv);
+
+  const options = commander.opts();
+
+  if (!options.ticker) {
+    options.ticker = "ALL_TICKERS";
+  }
+  let x = 0;
+  if (options.ticker === "ALL_TICKERS") {
+    for (let firm of firms) {
+      const filings = await getAllFilings(
+        firm,
+        options.search_form,
+        new Date(options.start),
+        new Date(options.end)
+      );
+
+      for (let filing of filings) {
+        // fetch HTML
+        const html = await getHTMLFromFiling(filing.url_);
+        // parse HTML
+        const parsedTables = parseHTML(html);
+        const filingDate = new Date(filing.filingDate)
+          .toISOString()
+          .split("T")[0];
+        // save data
+        saveData(
+          parsedTables,
+          filing.ticker,
+          filingDate,
+          filing.accessionNumber
+        );
+      }
+    }
+  } else {
+    const firm = firms.filter((f) => f.ticker == options.ticker) || firms;
+
+    if (!firm) {
+      console.error("Ticker not found");
+
+      return;
+    }
+    //check for commander options first
+
+    const filings = await getAllFilings(
+      firm,
+      options.search_form,
+      new Date(options.start),
+      new Date(options.end)
+    );
+    for (let filing of filings) {
+      const html = await getHTMLFromFiling(filing.url_);
+      await throttle(); // Add delay between requests
+      const parsedTables = parseHTML(html);
+      filingDate = new Date(filing.filingDate).toISOString().split("T")[0];
+
+      saveData(parsedTables, filing.ticker, filingDate, filing.accessionNumber);
+    }
+  }
+}
+
+main();
