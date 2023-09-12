@@ -7,7 +7,7 @@ export const formFields = [
   },
   {
     id: "adsh",
-    label: "Accession Number:",
+    label: "ADSH:",
     type: "text",
     required: true,
   },
@@ -45,7 +45,7 @@ export const formFields = [
   },
   {
     id: "non_binary",
-    label: "Non-Binary:",
+    label: "N-B:",
     type: "text",
   },
   {
@@ -60,7 +60,7 @@ export const formFields = [
   },
   {
     id: "no_answer",
-    label: "No Answer:",
+    label: "N-A:",
     type: "text",
   },
   {

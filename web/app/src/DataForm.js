@@ -122,16 +122,19 @@ export default function DataForm() {
         console.log("Error updating data", error);
       });
   };
-
+  let colorz = { color: "#DC143C" };
   return (
     <div style={{ padding: "15px" }}>
-      <Button style={{ margin: "5px" }} onClick={handleBack}>
+      <Button style={{ color: "#DC143C", margin: "5px" }} onClick={handleBack}>
         Back
       </Button>
-      <Button style={{ margin: "5px" }} onClick={handleForward}>
+      <Button
+        style={{ color: " #28C9AF", margin: "5px" }}
+        onClick={handleForward}
+      >
         Forward
       </Button>
-      <Row style={{ padding: "10px" }}>
+      <Row style={{ padding: "10px" }} className="justify-content-center">
         {formFields.map((field) => {
           // console.log(formData);
           // currentFirmInfo.firm
@@ -140,6 +143,7 @@ export default function DataForm() {
               <Form.Group key={field.id} controlId={field.id}>
                 <Form.Label>{field.label}</Form.Label>
                 <Form.Control
+                  size="sm"
                   onChange={(e) =>
                     handleFieldChange(e.target.name, e.target.value)
                   }
@@ -159,8 +163,8 @@ export default function DataForm() {
         <Col md={3}>
           <h3>
             <u>
-              Firm: <br />
-              <span style={{ color: "blue" }}>FILING ORDER# {fileId + 1}</span>
+              ROW #: <br />
+              <span style={{ color: " #28C9AF" }}>{fileId}</span>
             </u>
           </h3>
         </Col>
@@ -168,7 +172,7 @@ export default function DataForm() {
           <h3>
             <u>
               Firm: <br />
-              <span style={{ color: "blue" }}>{formData.firm}</span>
+              <span style={colorz}>{formData.firm}</span>
             </u>
           </h3>
         </Col>
@@ -176,15 +180,15 @@ export default function DataForm() {
           <h3>
             <u>
               Date: <br />
-              <span style={{ color: "red" }}>{formData.date}</span>
+              <span style={{ color: " #28C9AF" }}>{formData.date}</span>
             </u>
           </h3>
         </Col>
         <Col md={3}>
           <h3>
             <u>
-              Accession Number: <br />{" "}
-              <span style={{ color: "green" }}>{formData.adsh}</span>
+              ADSH: <br />
+              <span style={colorz}>{formData.adsh}</span>
             </u>
           </h3>
         </Col>
@@ -193,9 +197,12 @@ export default function DataForm() {
       <hr style={{ border: "none", borderTop: "1px solid red" }} />
       {tables &&
         tables.map((table, index) => (
-          <button style={{ margin: "2px" }} onClick={() => toggleTable(index)}>
+          <Button
+            style={{ color: " #28C9AF", margin: "2px" }}
+            onClick={() => toggleTable(index)}
+          >
             Table {index + 1}
-          </button>
+          </Button>
         ))}
 
       {tables &&
