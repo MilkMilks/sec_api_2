@@ -11,7 +11,7 @@ export default function DataForm() {
   const [htmlContent, setHtmlContent] = useState("");
   const [tables, setTables] = useState([]);
   const [fileId, setFileId] = useState(0);
-  const [totalFilesLength, setTotalFilesLength] = useState(null);
+  const [totalFilesLength, setTotalFilesLength] = useState(0);
   const [formData, setFormData] = useState(initialFormData);
 
   useEffect(() => {
@@ -49,9 +49,9 @@ export default function DataForm() {
         male: male || "",
         female: female || "",
         lgbt: lgbt || "",
+        non_binary: non_binary || "",
         asian: asian || "",
         latinx: latinx || "",
-        non_binary: non_binary || "",
         no_answer: no_answer || "",
         directors: directors || "",
         notes: notes || "",
@@ -97,7 +97,7 @@ export default function DataForm() {
   const handleForward = async () => {
     await axios.post("/update-observations", formData);
     let newId = fileId + 1;
-    if (newId > totalFilesLength) {
+    if (newId > totalFilesLength - 1) {
       newId = 0;
     }
 
