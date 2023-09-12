@@ -5,6 +5,7 @@ const bodyParser = require("body-parser");
 const cors = require("cors");
 const axios = require("axios");
 const fs = require("fs");
+// const url_ = `https://www.sec.gov/Archives/edgar/data/${cik}/${accessionNumber}/${primaryDocument}`;
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -47,7 +48,6 @@ app.get("/get-html-file/:id", (req, res) => {
   }
   const id = req.params.id;
   const filePath = htmlFiles[id];
-
   const content = readFile(filePath);
   const pathParts = filePath.split("\\");
   const firm = `${pathParts[2]} ${pathParts[3]
