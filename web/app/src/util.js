@@ -6,6 +6,12 @@ export const formFields = [
     required: true,
   },
   {
+    id: "adsh",
+    label: "Accession Number:",
+    type: "text",
+    required: true,
+  },
+  {
     id: "firm",
     label: "Firm:",
     type: "text",
