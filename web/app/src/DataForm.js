@@ -5,6 +5,8 @@ import cheerio from "cheerio";
 import parse from "html-react-parser";
 import { formFields, initialFormData } from "./util";
 
+// https://raw.githubusercontent.com/MilkMilks/nasdaq_listing_data/main/listing.csv
+// const url_ = `https://www.sec.gov/Archives/edgar/data/${cik}/${accessionNumber}/${primaryDocument}`
 export default function DataForm() {
   const [expandedTables, setExpandedTables] = useState([]);
   const [expandedTable, setExpandedTable] = useState(-1);
@@ -13,12 +15,55 @@ export default function DataForm() {
   const [fileId, setFileId] = useState(0);
   const [totalFilesLength, setTotalFilesLength] = useState(0);
   const [formData, setFormData] = useState(initialFormData);
+  const [urls, setUrls] = useState([]);
+  const [fetchedCIKs, setFetchedCIKs] = useState([]);
+  const [keyPressed, setKeyPressed] = useState(null);
+  // async function fetch_original_urls() {
+  //   const response = await axios.get("/public/urls_extracted.txt");
+  //   return response.data.split("\n");
+  // }
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      setKeyPressed(e.keyCode);
+    };
+
+    document.addEventListener("keydown", handleKeyDown);
+
+    return () => {
+      document.removeEventListener("keydown", handleKeyDown);
+    };
+  }, []);
+  useEffect(() => {
+    if (keyPressed === 37) {
+      handleBack();
+    }
+
+    if (keyPressed === 39) {
+      handleForward();
+    }
+
+    setKeyPressed(null);
+  }, [keyPressed]);
+  useEffect(() => {
+    axios
+      .get(
+        "https://raw.githubusercontent.com/MilkMilks/nasdaq_listing_data/main/egar2020"
+      )
+      .then((res) => {
+        setUrls(res.data.split("\n"));
+      });
+  }, []);
+  useEffect(() => {
+    axios.get("./public/nasdaq_firms.tsv").then((res) => {
+      let temp = res.data.split("\n");
+      setFetchedCIKs(temp);
+    });
+  }, []);
 
   useEffect(() => {
     axios.get(`/get-html-file/${fileId}`).then((res) => {
       setHtmlContent(res.data.html);
       setTables([]);
-
       let [
         date,
         adsh,
@@ -123,6 +168,8 @@ export default function DataForm() {
       });
   };
   let colorz = { color: "#DC143C" };
+  // Handle key press
+
   return (
     <div style={{ padding: "15px" }}>
       <Button style={{ color: "#DC143C", margin: "5px" }} onClick={handleBack}>
@@ -132,7 +179,40 @@ export default function DataForm() {
         style={{ color: " #28C9AF", margin: "5px" }}
         onClick={handleForward}
       >
-        Forward
+        Forward{" "}
+        {/* // const url_ = `https://www.sec.gov/Archives/edgar/data/${cik}/${accessionNumber}/${primaryDocument}` Forward */}
+      </Button>
+      <Button
+        onClick={() => {
+          //match the ticker (firm) with the cik in fetchedCIKs
+          let cik = "";
+          let ticker = formData.firm;
+          for (let i = 0; i < fetchedCIKs.length; i++) {
+            let row = fetchedCIKs[i].split("\t");
+            if (row[1] == ticker) {
+              cik = row[0];
+              break;
+            }
+          }
+          //mow match the cik in urls var
+          // https://www.sec.gov/Archives/edgar/data/${cik}/${formData.adsh}/${primaryDocument}
+          let primaryDocument = "";
+          for (let i = 0; i < urls.length; i++) {
+            let parts = urls[i].split("/");
+            if (urls[i].includes(cik) && urls[i].includes(formData.adsh)) {
+              primaryDocument = parts[parts.length - 1];
+              break;
+            }
+          }
+
+          const fullUrl = `https://www.sec.gov/Archives/edgar/data/${cik}/${formData.adsh}/${primaryDocument}`;
+
+          console.log("Full URL:", fullUrl);
+
+          window.open(fullUrl);
+        }}
+      >
+        CHECK FILING DOC
       </Button>
       <Row style={{ padding: "10px" }} className="justify-content-center">
         {formFields.map((field) => {

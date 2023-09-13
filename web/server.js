@@ -17,7 +17,7 @@ app.use(cors());
 
 // Serve React build
 app.use(express.static(path.join(__dirname, "/dist")));
-
+app.use(express.static(path.join(__dirname, "/dist/public")));
 // Helper functions
 const readFile = (filePath) => {
   return fs.readFileSync(filePath, "utf8");
