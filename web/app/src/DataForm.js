@@ -18,10 +18,8 @@ export default function DataForm() {
   const [urls, setUrls] = useState([]);
   const [fetchedCIKs, setFetchedCIKs] = useState([]);
   const [keyPressed, setKeyPressed] = useState(null);
-  // async function fetch_original_urls() {
-  //   const response = await axios.get("/public/urls_extracted.txt");
-  //   return response.data.split("\n");
-  // }
+  const [enteredTicker, setEnteredTicker] = useState("");
+  const [allFiles, setAllFiles] = useState([]);
   useEffect(() => {
     const handleKeyDown = (e) => {
       setKeyPressed(e.keyCode);
@@ -33,6 +31,10 @@ export default function DataForm() {
       document.removeEventListener("keydown", handleKeyDown);
     };
   }, []);
+  useEffect(() => {
+    handleTickerChange(enteredTicker);
+  }, [enteredTicker]);
+
   useEffect(() => {
     if (keyPressed === 37) {
       handleBack();
@@ -53,11 +55,16 @@ export default function DataForm() {
         setUrls(res.data.split("\n"));
       });
   }, []);
+
   useEffect(() => {
-    axios.get("./public/nasdaq_firms.tsv").then((res) => {
-      let temp = res.data.split("\n");
-      setFetchedCIKs(temp);
-    });
+    axios
+      .get(
+        "https://raw.githubusercontent.com/MilkMilks/nasdaq_listing_data/main/listing.csv"
+      )
+      .then((res) => {
+        let temp = res.data.split("\n");
+        setFetchedCIKs(temp);
+      });
   }, []);
 
   useEffect(() => {
@@ -83,6 +90,7 @@ export default function DataForm() {
 
       if (!totalFilesLength) {
         setTotalFilesLength(res.data.TOTAL_FILE_LENGTH);
+        setAllFiles(res.data.filing_paths.split("\n"));
       }
 
       setFormData({
@@ -121,6 +129,34 @@ export default function DataForm() {
   // Function to reset formData
   const resetFormData = () => {
     setFormData(initialFormData);
+  };
+
+  const handleTickerChange = async () => {
+    console.log("enteredTicker", enteredTicker);
+    // find url containing cik
+    if (enteredTicker.length) {
+      let fileIdMatch = allFiles.findIndex((url) => {
+        const name = url.split("\\")[1];
+        return name === enteredTicker;
+      });
+
+      console.log("First Row of ticker found: ", fileIdMatch);
+
+      if (fileIdMatch && fileIdMatch >= 0) {
+        console.log("fileIdMatch", fileIdMatch, " <--- here?");
+        console.log("formData", formData);
+        await axios.post("/update-observations", formData);
+        setFileId(fileIdMatch);
+        setExpandedTable(-1);
+        setExpandedTables([]);
+        resetFormData();
+      } else {
+        console.log("fileIdMatch", fileIdMatch, " <--- not here?");
+        console.log("No match found");
+      }
+    } else if (enteredTicker.length > 5) {
+      console.log("Too many characters, 5 max ticker length.");
+    }
   };
 
   const handleBack = async () => {
@@ -179,8 +215,7 @@ export default function DataForm() {
         style={{ color: " #28C9AF", margin: "5px" }}
         onClick={handleForward}
       >
-        Forward{" "}
-        {/* // const url_ = `https://www.sec.gov/Archives/edgar/data/${cik}/${accessionNumber}/${primaryDocument}` Forward */}
+        Forward
       </Button>
       <Button
         onClick={() => {
@@ -188,8 +223,9 @@ export default function DataForm() {
           let cik = "";
           let ticker = formData.firm;
           for (let i = 0; i < fetchedCIKs.length; i++) {
-            let row = fetchedCIKs[i].split("\t");
-            if (row[1] == ticker) {
+            let row = fetchedCIKs[i].split(",");
+            if (row[0] == ticker) {
+              console.log("row: ", row);
               cik = row[0];
               break;
             }
@@ -214,6 +250,14 @@ export default function DataForm() {
       >
         CHECK FILING DOC
       </Button>
+      <Form.Control
+        type="text"
+        onChange={(e) => {
+          setEnteredTicker(e.target.value);
+        }}
+      />
+      <Button onClick={handleTickerChange}>GO TO TICKER</Button>
+      CHECK FILING DOCzz
       <Row style={{ padding: "10px" }} className="justify-content-center">
         {formFields.map((field) => {
           // console.log(formData);
@@ -284,7 +328,6 @@ export default function DataForm() {
             Table {index + 1}
           </Button>
         ))}
-
       {tables &&
         tables.map((table, index) => {
           if (expandedTable === index) {
