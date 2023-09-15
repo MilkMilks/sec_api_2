@@ -17,7 +17,7 @@ app.use(cors());
 
 // Serve React build
 app.use(express.static(path.join(__dirname, "/dist")));
-app.use(express.static(path.join(__dirname, "/dist/public")));
+
 // Helper functions
 const readFile = (filePath) => {
   return fs.readFileSync(filePath, "utf8");
@@ -77,6 +77,7 @@ app.get("/get-html-file/:id", (req, res) => {
       return true;
     }
   });
+  const filing_paths = fs.readFileSync("./file_names.txt", "utf8");
 
   res.json({
     html: content,
@@ -85,6 +86,7 @@ app.get("/get-html-file/:id", (req, res) => {
     accessionNumber,
     filing_row,
     TOTAL_FILE_LENGTH: htmlFiles.length,
+    filing_paths,
   });
 });
 
