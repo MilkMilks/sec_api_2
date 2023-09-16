@@ -226,7 +226,7 @@ export default function DataForm() {
             let row = fetchedCIKs[i].split(",");
             if (row[0] == ticker) {
               console.log("row: ", row);
-              cik = row[0];
+              cik = row[1];
               break;
             }
           }
@@ -256,8 +256,7 @@ export default function DataForm() {
           setEnteredTicker(e.target.value);
         }}
       />
-      <Button onClick={handleTickerChange}>GO TO TICKER</Button>
-      CHECK FILING DOCzz
+
       <Row style={{ padding: "10px" }} className="justify-content-center">
         {formFields.map((field) => {
           // console.log(formData);
