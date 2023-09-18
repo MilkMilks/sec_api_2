@@ -90,11 +90,11 @@ export default function DataForm() {
 
       if (!totalFilesLength) {
         setTotalFilesLength(res.data.TOTAL_FILE_LENGTH);
-        setAllFiles(res.data.filing_paths.split("\n"));
+        setAllFiles(res.data.filing_paths);
       }
 
       setFormData({
-        date: date || res.data.filingDate || "123",
+        date: date || res.data.filingDate || "",
         adsh: adsh || res.data.accessionNumber || "",
         firm: firm || res.data.firm.split(" ")[0] || "NA",
         source: source || "proxy",
@@ -220,16 +220,26 @@ export default function DataForm() {
       <Button
         onClick={() => {
           //match the ticker (firm) with the cik in fetchedCIKs
+          let ciks = new Set();
           let cik = "";
           let ticker = formData.firm;
           for (let i = 0; i < fetchedCIKs.length; i++) {
             let row = fetchedCIKs[i].split(",");
             if (row[0] == ticker) {
-              console.log("row: ", row);
               cik = row[1];
+              // ciks.add(row[1]);
               break;
             }
           }
+          // console.log("ciks", ciks.slice(0, 5));
+          // Loop through each CIK for the ticker
+          // for (let i = 0; i < ciks.length; i++) {
+          //   let row = ciks[i];
+          //   if (row === ticker) {
+          //     cik = row;
+          //     break;
+          //   }
+          // }
           //mow match the cik in urls var
           // https://www.sec.gov/Archives/edgar/data/${cik}/${formData.adsh}/${primaryDocument}
           let primaryDocument = "";
