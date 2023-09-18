@@ -19,7 +19,7 @@ app.use(cors());
 app.use(express.static(path.join(__dirname, "/dist")));
 
 // Helper functions
-const readFile = (filePath) => {
+const readFilez = (filePath) => {
   return fs.readFileSync(filePath, "utf8");
 };
 
@@ -42,13 +42,24 @@ const getHtmlFiles = (dirPath, arrayOfFiles) => {
 
 // Return HTML file
 app.get("/get-html-file/:id", (req, res) => {
-  const htmlFiles = getHtmlFiles("../filings");
+  let htmlFiles = getHtmlFiles("../filings");
+
   if (!htmlFiles) {
     console.log("it grabbed no file");
   }
+  htmlFiles = htmlFiles.filter((file, ii) => {
+    const datePart = file.split("\\")[3].split("__")[0];
+    const year = datePart.split("-")[0];
+    if (ii == 2) {
+      console.log("htmlFiles ", file);
+      console.log("htmlFiles ", datePart);
+      console.log("htmlFiles ", year);
+    }
+    return year == "2022";
+  });
   const id = req.params.id;
   const filePath = htmlFiles[id];
-  const content = readFile(filePath);
+  const content = readFilez(filePath);
   const pathParts = filePath.split("\\");
   const firm = `${pathParts[2]} ${pathParts[3]
     .split("__")[1]
@@ -69,6 +80,7 @@ app.get("/get-html-file/:id", (req, res) => {
     // DATE	ADSH	FIRM  SOURCE	BLACK	MALE	FEMALE	LGBT	NON_BINARY	NO_ANSWER	DIRECTORS	NOTES
     const [saved_date, saved_adsh, saved_firm] = row;
     let filtered_firm = firm.split(" ")[0];
+    console.log("filtered_firm", filtered_firm);
     if (
       saved_date == filingDate &&
       saved_firm == filtered_firm &&
@@ -77,7 +89,23 @@ app.get("/get-html-file/:id", (req, res) => {
       return true;
     }
   });
-  const filing_paths = fs.readFileSync("./file_names.txt", "utf8");
+  let filing_paths = fs.readFileSync("./file_names.txt", "utf8");
+  filing_paths = filing_paths.split("\r\n");
+  let filing_paths_return = [];
+  filing_paths.forEach((path, i) => {
+    // console.log("path", path);
+    if (i == 2) {
+      console.log("path", path.split("\\")[2].split("__")[0].slice(0, 4));
+    }
+    year = path.split("\\")[2].split("__")[0].slice(0, 4);
+    if (i == 2) {
+      console.log("2022 path", path);
+    }
+
+    if (year == "2022") {
+      filing_paths_return.push(path);
+    }
+  });
 
   res.json({
     html: content,
@@ -86,7 +114,7 @@ app.get("/get-html-file/:id", (req, res) => {
     accessionNumber,
     filing_row,
     TOTAL_FILE_LENGTH: htmlFiles.length,
-    filing_paths,
+    filing_paths: filing_paths_return,
   });
 });
 
@@ -111,7 +139,7 @@ app.post("/update-observations", (req, res) => {
 
   // Find index of observation to update
   const row = observations.findIndex((observation) => {
-    return observation.includes(`\t${updatedData.adsh}\t`);
+    return observation.includes(`\t${updatedData.adsh}\t${updatedData.firm}\t`);
   });
 
   if (row === -1) {
