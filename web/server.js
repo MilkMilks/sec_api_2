@@ -17,8 +17,19 @@ app.use(cors());
 
 // Serve React build
 app.use(express.static(path.join(__dirname, "/dist")));
-
+// Error: ENOENT: no such file or directory, open './OBSERVATIONS.TSV'
 // Helper functions
+
+// Check if the file exists
+if (!fs.existsSync("./OBSERVATIONS.TSV")) {
+  // If the file does not exist, create it
+  fs.writeFileSync("./OBSERVATIONS.TSV", "");
+  //now lets write the header row: DATE	ADSH	FIRM	SOURCE	BLACK	MALE	FEMALE	LGBT	NONBINARY	ASIAN	LATINX	NO_ANSWER	DIRECTORS	NOTES
+  fs.appendFileSync(
+    "./OBSERVATIONS.TSV",
+    "DATE\tADSH\tFIRM\tSOURCE\tBLACK\tMALE\tFEMALE\tLGBT\tNONBINARY\tASIAN\tLATINX\tNO_ANSWER\tDIRECTORS\tNOTES\n"
+  );
+}
 const readFilez = (filePath) => {
   return fs.readFileSync(filePath, "utf8");
 };
