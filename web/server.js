@@ -125,12 +125,16 @@ app.get("/get-html-file/:id", (req, res) => {
   //   }
   // });
 
+  const filing_url = `https://www.sec.gov/Archives/edgar/data/${nasdaq_row[1]}/${accessionNumber}/${pathParts[3]}`;
   res.json({
     html: content,
     firm,
     filingDate: "2022",
     accessionNumber,
     filing_row,
+    cik: nasdaq_row[1],
+    filing_url,
+    htmlFiles,
     TOTAL_FILE_LENGTH: htmlFiles.length,
   });
 });

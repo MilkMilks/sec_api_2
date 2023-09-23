@@ -8,10 +8,8 @@ import { formFields, initialFormData } from "./util";
 // https://raw.githubusercontent.com/MilkMilks/nasdaq_listing_data/main/listing.csv
 // const url_ = `https://www.sec.gov/Archives/edgar/data/${cik}/${accessionNumber}/${primaryDocument}`
 export default function DataForm() {
-  const [expandedTables, setExpandedTables] = useState([]);
-  const [expandedTable, setExpandedTable] = useState(-1);
   const [htmlContent, setHtmlContent] = useState("");
-
+  const [showHtml, setShowHtml] = useState(false);
   const [fileId, setFileId] = useState(0);
   const [totalFilesLength, setTotalFilesLength] = useState(0);
   const [formData, setFormData] = useState(initialFormData);
@@ -19,6 +17,8 @@ export default function DataForm() {
   const [fetchedCIKs, setFetchedCIKs] = useState([]);
   const [keyPressed, setKeyPressed] = useState(null);
   const [enteredTicker, setEnteredTicker] = useState("");
+  const [currentCik, setcurrentCik] = useState([]);
+  const [fullUrl, setFullUrl] = useState("");
   const [allFiles, setAllFiles] = useState([]);
   useEffect(() => {
     const handleKeyDown = (e) => {
@@ -69,22 +69,28 @@ export default function DataForm() {
 
   useEffect(() => {
     axios.get(`/get-html-file/${fileId}`).then((res) => {
-      const $ = cheerio.load(html);
+      setFullUrl(res.data.filing_url);
+      setAllFiles(res.data.htmlFiles);
+      let $ = cheerio.load(res.data.html);
+      let bodyHTML = $("text").html();
+      $ = cheerio.load(bodyHTML);
+      const baseUrl = res.data.filing_url.split("/").slice(0, -1).join("/");
 
-      const baseUrl = "https://example.com";
+      $("img").each(function () {
+        let src = $(this).attr("src");
 
-      $("img, a").each(function () {
-        const src = $(this).attr("src") || $(this).attr("href");
-
-        if (src && src.startsWith("/")) {
-          $(this).attr("src", baseUrl + src);
-          $(this).attr("href", baseUrl + src);
+        // src doesn't start with "/" but still needs updating
+        console.log("baseurl", baseUrl);
+        if (!src.startsWith("http")) {
+          $(this).attr("src", `${baseUrl}/${src}`);
         }
       });
 
+      // Remove all non-whitelisted tags
       const newHtml = $.html();
-      setHtmlContent(res.data.html);
+      setHtmlContent(newHtml);
 
+      ///end
       let [
         date,
         adsh,
@@ -101,16 +107,15 @@ export default function DataForm() {
         directors,
         notes,
       ] = res.data.filing_row[0] ? res.data.filing_row[0].split("\t") : [];
-
+      setcurrentCik(res.data.cik);
       if (!totalFilesLength) {
         setTotalFilesLength(res.data.TOTAL_FILE_LENGTH);
-        setAllFiles(res.data.filing_paths);
       }
 
       setFormData({
         date: date || res.data.filingDate || "",
         adsh: adsh || res.data.accessionNumber || "",
-        firm: firm || res.data.firm.split(" ")[0] || "NA",
+        firm: firm || res.data.firm || "ERROR",
         source: source || "proxy",
         black: black || "",
         male: male || "",
@@ -136,7 +141,7 @@ export default function DataForm() {
     // find url containing cik
     if (enteredTicker.length) {
       let fileIdMatch = allFiles.findIndex((url) => {
-        const name = url.split("\\")[1];
+        const name = url.split("\\")[2];
         return name === enteredTicker;
       });
 
@@ -144,12 +149,11 @@ export default function DataForm() {
 
       if (fileIdMatch && fileIdMatch >= 0) {
         console.log("fileIdMatch", fileIdMatch, " <--- here?");
-        console.log("formData", formData);
+
         await axios.post("/update-observations", formData);
         setFileId(fileIdMatch);
-        setExpandedTable(-1);
-        setExpandedTables([]);
         resetFormData();
+        setEnteredTicker(""); // reset input value
       } else {
         console.log("fileIdMatch", fileIdMatch, " <--- not here?");
         console.log("No match found");
@@ -170,8 +174,6 @@ export default function DataForm() {
     }
 
     setFileId(newId);
-    setExpandedTable(-1);
-    setExpandedTables([]);
     resetFormData();
   };
 
@@ -183,8 +185,6 @@ export default function DataForm() {
     }
 
     setFileId(newId);
-    setExpandedTable(-1);
-    setExpandedTables([]);
     resetFormData();
   };
 
@@ -220,40 +220,6 @@ export default function DataForm() {
       <Button
         onClick={() => {
           //match the ticker (firm) with the cik in fetchedCIKs
-          let ciks = new Set();
-          let cik = "";
-          let ticker = formData.firm;
-          for (let i = 0; i < fetchedCIKs.length; i++) {
-            let row = fetchedCIKs[i].split(",");
-            if (row[0] == ticker) {
-              cik = row[1];
-              // ciks.add(row[1]);
-              break;
-            }
-          }
-          // console.log("ciks", ciks.slice(0, 5));
-          // Loop through each CIK for the ticker
-          // for (let i = 0; i < ciks.length; i++) {
-          //   let row = ciks[i];
-          //   if (row === ticker) {
-          //     cik = row;
-          //     break;
-          //   }
-          // }
-          //mow match the cik in urls var
-          // https://www.sec.gov/Archives/edgar/data/${cik}/${formData.adsh}/${primaryDocument}
-          let primaryDocument = "";
-          for (let i = 0; i < urls.length; i++) {
-            let parts = urls[i].split("/");
-            if (urls[i].includes(cik) && urls[i].includes(formData.adsh)) {
-              primaryDocument = parts[parts.length - 1];
-              break;
-            }
-          }
-
-          const fullUrl = `https://www.sec.gov/Archives/edgar/data/${cik}/${formData.adsh}/${primaryDocument}`;
-          set;
-          console.log("Full URL:", fullUrl);
 
           window.open(fullUrl);
         }}
@@ -328,8 +294,10 @@ export default function DataForm() {
       </Row>
       {/* Add a horizontal line */}
       <hr style={{ border: "none", borderTop: "1px solid red" }} />
-
-      <div>{parse(htmlContent)}</div>
+      <Button onClick={() => setShowHtml((prev) => !prev)}>
+        {showHtml ? "Hide" : "Show"} HTML
+      </Button>
+      {showHtml && <div>{parse(htmlContent)}</div>}
     </div>
   );
 }
