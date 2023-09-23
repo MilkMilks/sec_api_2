@@ -11,7 +11,7 @@ export default function DataForm() {
   const [expandedTables, setExpandedTables] = useState([]);
   const [expandedTable, setExpandedTable] = useState(-1);
   const [htmlContent, setHtmlContent] = useState("");
-  const [tables, setTables] = useState([]);
+
   const [fileId, setFileId] = useState(0);
   const [totalFilesLength, setTotalFilesLength] = useState(0);
   const [formData, setFormData] = useState(initialFormData);
@@ -69,8 +69,22 @@ export default function DataForm() {
 
   useEffect(() => {
     axios.get(`/get-html-file/${fileId}`).then((res) => {
+      const $ = cheerio.load(html);
+
+      const baseUrl = "https://example.com";
+
+      $("img, a").each(function () {
+        const src = $(this).attr("src") || $(this).attr("href");
+
+        if (src && src.startsWith("/")) {
+          $(this).attr("src", baseUrl + src);
+          $(this).attr("href", baseUrl + src);
+        }
+      });
+
+      const newHtml = $.html();
       setHtmlContent(res.data.html);
-      setTables([]);
+
       let [
         date,
         adsh,
@@ -111,20 +125,6 @@ export default function DataForm() {
       });
     });
   }, [fileId]);
-
-  useEffect(() => {
-    // Parse logic
-    const $ = cheerio.load(htmlContent);
-
-    $("table").each((i, elem) => {
-      // Directly update state
-      setTables((prev) => [...prev, $(elem).html()]);
-    });
-  }, [htmlContent]);
-
-  const toggleTable = (index) => {
-    setExpandedTable((prev) => (prev === index ? -1 : index));
-  };
 
   // Function to reset formData
   const resetFormData = () => {
@@ -252,7 +252,7 @@ export default function DataForm() {
           }
 
           const fullUrl = `https://www.sec.gov/Archives/edgar/data/${cik}/${formData.adsh}/${primaryDocument}`;
-
+          set;
           console.log("Full URL:", fullUrl);
 
           window.open(fullUrl);
@@ -328,27 +328,8 @@ export default function DataForm() {
       </Row>
       {/* Add a horizontal line */}
       <hr style={{ border: "none", borderTop: "1px solid red" }} />
-      {tables &&
-        tables.map((table, index) => (
-          <Button
-            style={{ color: " #28C9AF", margin: "2px" }}
-            onClick={() => toggleTable(index)}
-          >
-            Table {index + 1}
-          </Button>
-        ))}
-      {tables &&
-        tables.map((table, index) => {
-          if (expandedTable === index) {
-            return (
-              <div key={index} suppressHydrationWarning={true}>
-                {parse(table)}
-              </div>
-            );
-          }
 
-          return null;
-        })}
+      <div>{parse(htmlContent)}</div>
     </div>
   );
 }

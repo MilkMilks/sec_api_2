@@ -4,11 +4,12 @@ const fs = require("fs");
 const firms = [];
 
 async function readFirms() {
-  const data = fs.readFileSync("./nasdaq_firms.tsv", "utf8");
+  const data = fs.readFileSync("./nasdaq_firms.csv", "utf8");
   data.split("\n").forEach((line, i) => {
-    let [cik, ticker] = line.trim().split("\t");
+    let [ticker, cik] = line.trim().split(",");
     ticker = ticker.toLowerCase();
-    if (i > 0) {
+    if (i > 0 && !firms.find((firm) => firm.cik === cik)) {
+      // console.log(`${cik} already exists`);
       firms.push({
         cik,
         ticker,
@@ -59,7 +60,10 @@ async function getAllFilings(cik_or_ticker, searchForm, startDate, endDate) {
 
 function saveURLsToFile(urls) {
   const data = JSON.stringify(urls);
-  fs.appendFileSync("urls_fetched.txt", "\n" + data, { encoding: "utf8" });
+  //dont write empty or null data
+  if (urls.length > 0) {
+    fs.appendFileSync("urls_fetched.txt", "\n" + data, { encoding: "utf8" });
+  }
 }
 
 async function main() {
@@ -68,8 +72,8 @@ async function main() {
     const filings = await getAllFilings(
       firm,
       "DEF 14A",
-      "2020-01-01",
-      "2023-8-31"
+      "2022-01-01",
+      "2022-12-31"
     );
     const urls = filings.map((filing) => {
       return { url_: filing.url_ };

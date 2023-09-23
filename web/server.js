@@ -36,6 +36,7 @@ const readFilez = (filePath) => {
 
 const getHtmlFiles = (dirPath, arrayOfFiles) => {
   const files = fs.readdirSync(dirPath);
+  // console.log("files", files);
   arrayOfFiles = arrayOfFiles || [];
 
   files &&
@@ -43,11 +44,12 @@ const getHtmlFiles = (dirPath, arrayOfFiles) => {
       if (fs.statSync(dirPath + "/" + file).isDirectory()) {
         arrayOfFiles = getHtmlFiles(dirPath + "/" + file, arrayOfFiles);
       } else {
-        if (file.endsWith(".html")) {
+        if (file.endsWith(".htm")) {
           arrayOfFiles.push(path.join(dirPath, "/", file));
         }
       }
     });
+  // console.log("arrayOfFiles", arrayOfFiles);
   return arrayOfFiles;
 };
 
@@ -58,27 +60,34 @@ app.get("/get-html-file/:id", (req, res) => {
   if (!htmlFiles) {
     console.log("it grabbed no file");
   }
-  htmlFiles = htmlFiles.filter((file, ii) => {
-    const datePart = file.split("\\")[3].split("__")[0];
-    const year = datePart.split("-")[0];
-    if (ii == 2) {
-      console.log("htmlFiles ", file);
-      console.log("htmlFiles ", datePart);
-      console.log("htmlFiles ", year);
-    }
-    return year == "2022";
-  });
+
   const id = req.params.id;
   const filePath = htmlFiles[id];
   const content = readFilez(filePath);
   const pathParts = filePath.split("\\");
-  const firm = `${pathParts[2]} ${pathParts[3]
-    .split("__")[1]
-    .split(".")[0]
-    .substring(0, 10)}`;
-  const filingDate = pathParts[3].split("__")[0];
-  const accessionNumber = pathParts[3].split("__")[1].split(".")[0];
+  console.log("pathParts", pathParts);
+  const firm = `${pathParts[2]}`;
+  console.log("FIRM", firm);
+  const nasdaq_rows = fs
+    .readFileSync("./nasdaq_firms.csv", "utf8")
+    .split("\r\n");
 
+  let nasdaq_row = nasdaq_rows.filter((line, i) => {
+    const row = line.split(",");
+    const saved_firm = row[0];
+    if (saved_firm == firm) {
+      return true;
+    }
+  });
+  nasdaq_row = nasdaq_row[0].split(",");
+
+  let urls = fs.readFileSync("./urls.txt", "utf8").split("\r\n");
+
+  let url = urls.filter((url) => url.split("/")[6] == nasdaq_row[1])[0];
+  console.log("url", url);
+  const accessionNumber = url.split("/")[7];
+  console.log("accessionNumber", accessionNumber);
+  // console.log("accessionNumber", accessionNumber);
   let tsv = fs.readFileSync("./OBSERVATIONS.TSV", "utf8");
   //split into array of lines
   tsv = tsv.split("\n");
@@ -89,43 +98,40 @@ app.get("/get-html-file/:id", (req, res) => {
     const row = line.split("\t");
 
     // DATE	ADSH	FIRM  SOURCE	BLACK	MALE	FEMALE	LGBT	NON_BINARY	NO_ANSWER	DIRECTORS	NOTES
-    const [saved_date, saved_adsh, saved_firm] = row;
-    let filtered_firm = firm.split(" ")[0];
+    const saved_adsh = row[1];
+    let filtered_firm = firm;
     console.log("filtered_firm", filtered_firm);
-    if (
-      saved_date == filingDate &&
-      saved_firm == filtered_firm &&
-      saved_adsh == accessionNumber
-    ) {
+    if (saved_adsh == accessionNumber) {
       return true;
     }
   });
-  let filing_paths = fs.readFileSync("./file_names.txt", "utf8");
-  filing_paths = filing_paths.split("\r\n");
-  let filing_paths_return = [];
-  filing_paths.forEach((path, i) => {
-    // console.log("path", path);
-    if (i == 2) {
-      console.log("path", path.split("\\")[2].split("__")[0].slice(0, 4));
-    }
-    year = path.split("\\")[2].split("__")[0].slice(0, 4);
-    if (i == 2) {
-      console.log("2022 path", path);
-    }
+  //i dont think we need this anymore?
+  // let filing_paths = fs.readFileSync("./file_names.txt", "utf8");
+  // filing_paths = filing_paths.split("\r\n");
 
-    if (year == "2022") {
-      filing_paths_return.push(path);
-    }
-  });
+  // let filing_paths_return = [];
+  // filing_paths.forEach((path, i) => {
+  //   // console.log("path", path);
+  //   if (i == 2) {
+  //     console.log("path", path.split("\\")[2].split("__")[0].slice(0, 4));
+  //   }
+  //   year = path.split("\\")[2].split("__")[0].slice(0, 4);
+  //   if (i == 2) {
+  //     console.log("2022 path", path);
+  //   }
+
+  //   if (year == "2022") {
+  //     filing_paths_return.push(path);
+  //   }
+  // });
 
   res.json({
     html: content,
     firm,
-    filingDate,
+    filingDate: "2022",
     accessionNumber,
     filing_row,
     TOTAL_FILE_LENGTH: htmlFiles.length,
-    filing_paths: filing_paths_return,
   });
 });
 
