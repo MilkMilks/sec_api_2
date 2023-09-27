@@ -68,22 +68,24 @@ app.get("/get-html-file/:id", (req, res) => {
   console.log("pathParts", pathParts);
   const firm = `${pathParts[2]}`;
   console.log("FIRM", firm);
-  const nasdaq_rows = fs
-    .readFileSync("./nasdaq_firms.csv", "utf8")
-    .split("\r\n");
+  const nasdaq_rows = fs.readFileSync("./sec_tickers_ciks.json", "utf8");
+  // Parse the JSON data
+  const secTickers = JSON.parse(nasdaq_rows);
+  for (const entry of Object.values(secTickers)) {
+    entry.ticker = entry.ticker.toLowerCase();
+  }
 
-  let nasdaq_row = nasdaq_rows.filter((line, i) => {
-    const row = line.split(",");
-    const saved_firm = row[0];
-    if (saved_firm == firm) {
-      return true;
-    }
-  });
-  nasdaq_row = nasdaq_row[0].split(",");
+  const temp_nasdaq_row = Object.values(secTickers).find(
+    (entry) => entry.ticker === firm
+  );
+  console.log("temp_nasdaq_row", temp_nasdaq_row);
+  const nasdaq_csv = `${temp_nasdaq_row.cik_str},${temp_nasdaq_row.ticker}`;
+  let nasdaq_row = nasdaq_csv.split(",");
 
-  let urls = fs.readFileSync("./urls.txt", "utf8").split("\r\n");
-
-  let url = urls.filter((url) => url.split("/")[6] == nasdaq_row[1])[0];
+  let urls = fs.readFileSync("./urls_final.txt", "utf8").split("\n");
+  console.log("urlsss", urls[0].split("/")[6]);
+  console.log("nasdaq_row", nasdaq_row);
+  let url = urls.filter((url) => url.split("/")[6] == nasdaq_row[0])[0];
   console.log("url", url);
   const accessionNumber = url.split("/")[7];
   console.log("accessionNumber", accessionNumber);
@@ -105,27 +107,14 @@ app.get("/get-html-file/:id", (req, res) => {
       return true;
     }
   });
-  //i dont think we need this anymore?
-  // let filing_paths = fs.readFileSync("./file_names.txt", "utf8");
-  // filing_paths = filing_paths.split("\r\n");
+  // https://www.sec.gov/Archives/edgar/data/1576873/000149315222027313/formdef14a.htm split this part off for filing
+  const parts = url.split("/");
 
-  // let filing_paths_return = [];
-  // filing_paths.forEach((path, i) => {
-  //   // console.log("path", path);
-  //   if (i == 2) {
-  //     console.log("path", path.split("\\")[2].split("__")[0].slice(0, 4));
-  //   }
-  //   year = path.split("\\")[2].split("__")[0].slice(0, 4);
-  //   if (i == 2) {
-  //     console.log("2022 path", path);
-  //   }
+  // Remove the last part
+  parts.pop();
 
-  //   if (year == "2022") {
-  //     filing_paths_return.push(path);
-  //   }
-  // });
-
-  const filing_url = `https://www.sec.gov/Archives/edgar/data/${nasdaq_row[1]}/${accessionNumber}/${pathParts[3]}`;
+  // Join the remaining parts to get the base URL
+  const filing_url = parts.join("/");
   res.json({
     html: content,
     firm,
