@@ -13,8 +13,6 @@ export default function DataForm() {
   const [fileId, setFileId] = useState(0);
   const [totalFilesLength, setTotalFilesLength] = useState(0);
   const [formData, setFormData] = useState(initialFormData);
-  const [urls, setUrls] = useState([]);
-  const [fetchedCIKs, setFetchedCIKs] = useState([]);
   const [keyPressed, setKeyPressed] = useState(null);
   const [enteredTicker, setEnteredTicker] = useState("");
   const [currentCik, setcurrentCik] = useState([]);
@@ -46,26 +44,6 @@ export default function DataForm() {
 
     setKeyPressed(null);
   }, [keyPressed]);
-  useEffect(() => {
-    axios
-      .get(
-        "https://raw.githubusercontent.com/MilkMilks/nasdaq_listing_data/main/egar2020"
-      )
-      .then((res) => {
-        setUrls(res.data.split("\n"));
-      });
-  }, []);
-
-  useEffect(() => {
-    axios
-      .get(
-        "https://raw.githubusercontent.com/MilkMilks/nasdaq_listing_data/main/listing.csv"
-      )
-      .then((res) => {
-        let temp = res.data.split("\n");
-        setFetchedCIKs(temp);
-      });
-  }, []);
 
   useEffect(() => {
     axios.get(`/get-html-file/${fileId}`).then((res) => {
@@ -225,6 +203,18 @@ export default function DataForm() {
         }}
       >
         CHECK FILING DOC
+      </Button>
+      <Button
+        onClick={() => {
+          //match the ticker (firm) with the cik in fetchedCIKs
+          //disect fullUrl to get ticker
+          // https://www.sec.gov/Archives/edgar/data/1621221/000164033422001134/artl_def14a.htm/2022-05-26___artl
+          const cik = fullUrl.split("/")[6];
+          const googleFirm = `https://www.google.com/search?q=${formData.firm} investor relations`;
+          window.open(googleFirm);
+        }}
+      >
+        GOOGLE IT
       </Button>
       <Form.Control
         type="text"
